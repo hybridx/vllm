@@ -7,50 +7,119 @@ This guide explains how to run vLLM on macOS with Apple Silicon (M1/M2/M3/M4).
 - macOS with Apple Silicon (ARM64)
 - Python 3.10 - 3.13
 - At least 8GB RAM (16GB+ recommended for larger models)
+- Git
 
-## Quick Start
+## Installation
 
-### 1. Create and Activate Virtual Environment
+### 1. Clone the Repository
 
 ```bash
-# Navigate to the vllm directory
-cd /Users/denair/testing/tryVllm/vllm
+git clone https://github.com/vllm-project/vllm.git
+cd vllm
+```
 
-# Create virtual environment (if not exists)
+### 2. Create Virtual Environment
+
+```bash
 python3 -m venv .venv
+```
 
-# Activate virtual environment
+### 3. Get Your Full Path (Important!)
+
+Run this command and **copy the output** - you'll need it to run vLLM from anywhere:
+
+```bash
+pwd
+```
+
+Example output: `/Users/yourname/projects/vllm`
+
+Save this path! Your activate command will be:
+```
+source <YOUR_PATH>/.venv/bin/activate
+```
+
+### 4. Activate Virtual Environment
+
+```bash
 source .venv/bin/activate
 ```
 
 > ⚠️ **Important**: Always activate the virtual environment before running any vLLM commands!
+> 
+> You can verify it's active by running:
+> ```bash
+> which python
+> # Should show: <YOUR_PATH>/.venv/bin/python
+> ```
 
-### 2. Install Dependencies
+### 5. Install Dependencies
 
 ```bash
-# Install PyTorch (required version for this vLLM build)
+# Install PyTorch
 pip install torch==2.10.0
 
 # Install vLLM in editable mode
 pip install -e .
 ```
 
-### 3. Run the API Server
+## Running the Server
+
+### From the vllm Directory
 
 ```bash
-# Start the vLLM API server
+# Make sure you're in the vllm directory with venv activated
+source .venv/bin/activate
+
 python -m vllm.entrypoints.api_server \
   --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
-  --tensor-parallel-size 1 \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --dtype float16
+```
+
+### From Anywhere (Using Full Path)
+
+Use the path you got from `pwd` earlier:
+
+```bash
+# Replace <YOUR_PATH> with your actual path from pwd
+# Example: /Users/yourname/projects/vllm
+
+source <YOUR_PATH>/.venv/bin/activate && \
+cd <YOUR_PATH> && \
+python -m vllm.entrypoints.api_server \
+  --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --dtype float16
+```
+
+**Example with real path:**
+```bash
+source /Users/john/projects/vllm/.venv/bin/activate && \
+cd /Users/john/projects/vllm && \
+python -m vllm.entrypoints.api_server \
+  --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
   --host 0.0.0.0 \
   --port 8000 \
   --dtype float16
 ```
 
 The server will:
-1. Download the model (first run only, ~75 seconds)
-2. Load and warm up the model (~25 seconds)
+1. Download the model (first run only)
+2. Load and warm up the model
 3. Start serving on `http://0.0.0.0:8000`
+
+### One-Liner (from vllm directory)
+
+```bash
+source .venv/bin/activate && python -m vllm.entrypoints.api_server \
+  --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --dtype float16
+```
 
 ## Testing the Server
 
@@ -80,22 +149,28 @@ Open in browser: http://localhost:8000/docs
 
 ## Using Different Models
 
-Replace the model name with any Hugging Face model:
-
 ```bash
-# Llama 2 (requires HF token)
+# Always activate the venv first
+source .venv/bin/activate
+
+# TinyLlama (small, good for testing)
 python -m vllm.entrypoints.api_server \
-  --model meta-llama/Llama-2-7b-chat-hf \
+  --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
   --dtype float16
 
-# Mistral
+# Phi-2 (small, fast)
+python -m vllm.entrypoints.api_server \
+  --model microsoft/phi-2 \
+  --dtype float16
+
+# Mistral 7B
 python -m vllm.entrypoints.api_server \
   --model mistralai/Mistral-7B-Instruct-v0.1 \
   --dtype float16
 
-# Phi-2 (smaller, faster)
+# Llama 2 (requires Hugging Face token)
 python -m vllm.entrypoints.api_server \
-  --model microsoft/phi-2 \
+  --model meta-llama/Llama-2-7b-chat-hf \
   --dtype float16
 ```
 
@@ -108,7 +183,7 @@ python -m vllm.entrypoints.api_server \
 | `--port` | Port to bind | `8000` |
 | `--dtype` | Data type (`float16`, `float32`, `auto`) | `auto` |
 | `--max-model-len` | Maximum sequence length | Model default |
-| `--tensor-parallel-size` | Number of GPUs for tensor parallelism | `1` |
+| `--tensor-parallel-size` | Number of tensor parallel workers | `1` |
 
 ## Troubleshooting
 
@@ -118,7 +193,10 @@ python -m vllm.entrypoints.api_server \
 
 **Fix**:
 ```bash
+# Activate the virtual environment
 source .venv/bin/activate
+
+# Install PyTorch
 pip install torch==2.10.0
 ```
 
@@ -128,14 +206,12 @@ pip install torch==2.10.0
 
 **Fix**:
 ```bash
-# Ensure correct PyTorch version
+source .venv/bin/activate
 pip install torch==2.10.0
-
-# Reinstall vLLM
 pip install -e .
 ```
 
-### Error: `python` points to wrong Python
+### Error: Wrong Python being used
 
 **Cause**: Virtual environment not activated.
 
@@ -143,40 +219,56 @@ pip install -e .
 ```bash
 # Check which python is being used
 which python
-# Should show: /Users/denair/testing/tryVllm/.venv/bin/python
 
-# If not, activate venv
-source /Users/denair/testing/tryVllm/.venv/bin/activate
+# If it doesn't point to .venv/bin/python, activate:
+source .venv/bin/activate
 ```
 
-### Slow Model Loading
+### Slow First Run
 
-First run downloads the model from Hugging Face. Subsequent runs will be faster as the model is cached in `~/.cache/huggingface/`.
+The first run downloads the model from Hugging Face. Subsequent runs use the cached model from `~/.cache/huggingface/`.
 
-## One-Liner Quick Start
+## Shell Alias (Optional)
 
-Copy and paste this to start the server:
+Add this to your `~/.zshrc` or `~/.bashrc` for quick access.
 
+First, get your path:
 ```bash
-cd /Users/denair/testing/tryVllm/vllm && \
-source .venv/bin/activate && \
-python -m vllm.entrypoints.api_server \
-  --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --dtype float16
+cd /path/to/vllm
+pwd
+# Copy the output, e.g.: /Users/yourname/projects/vllm
+```
+
+Then add to `~/.zshrc` (replace with YOUR path from pwd):
+```bash
+# Add to ~/.zshrc - replace the path with your pwd output
+alias vllm-start='source /Users/yourname/projects/vllm/.venv/bin/activate && cd /Users/yourname/projects/vllm && python -m vllm.entrypoints.api_server'
+
+# Reload shell
+source ~/.zshrc
+
+# Usage:
+vllm-start --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 --dtype float16
 ```
 
 ## Notes
 
-- vLLM on macOS runs on **CPU** (not MPS/GPU acceleration yet)
-- Performance will be slower than NVIDIA GPU setups
-- Smaller models (1B-3B parameters) work best for local development
-- The `VLLM_USE_CUDA=0` flag is not needed on macOS
+- vLLM on macOS runs on **CPU** (MPS/GPU acceleration not yet available)
+- Performance is slower than NVIDIA GPU setups
+- Smaller models (1B-3B parameters) recommended for local development
+- The `VLLM_USE_CUDA=0` flag is **not needed** on macOS
+
+## Recommended Models for macOS
+
+| Model | Size | Notes |
+|-------|------|-------|
+| `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | 1.1B | Fast, good for testing |
+| `microsoft/phi-2` | 2.7B | Good quality for size |
+| `Qwen/Qwen2-1.5B-Instruct` | 1.5B | Multilingual |
+| `google/gemma-2b-it` | 2B | Instruction tuned |
 
 ## Useful Links
 
 - [vLLM Documentation](https://docs.vllm.ai/)
 - [Hugging Face Model Hub](https://huggingface.co/models)
 - [vLLM GitHub](https://github.com/vllm-project/vllm)
-
